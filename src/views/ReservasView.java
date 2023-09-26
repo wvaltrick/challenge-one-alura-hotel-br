@@ -11,15 +11,23 @@ import javax.swing.ImageIcon;
 import java.awt.Color;
 import javax.swing.JTextField;
 import com.toedter.calendar.JDateChooser;
+
+import DAO.ReservaDAO;
+import DTO.ReservaDTO;
+
 import java.awt.Font;
 import javax.swing.JComboBox;
 import javax.swing.DefaultComboBoxModel;
-import java.text.Format;
+
+import java.util.Calendar;
+import java.util.Date;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionAdapter;
 import java.awt.Toolkit;
 import java.beans.PropertyChangeListener;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.beans.PropertyChangeEvent;
 import javax.swing.JSeparator;
 import javax.swing.SwingConstants;
@@ -140,9 +148,54 @@ public class ReservasView extends JFrame {
 		txtDataS.setBackground(Color.WHITE);
 		txtDataS.setFont(new Font("Roboto", Font.PLAIN, 18));
 		txtDataS.addPropertyChangeListener(new PropertyChangeListener() {
+			
+			
 			public void propertyChange(PropertyChangeEvent evt) {
 				//Ativa o evento, após o usuário selecionar as datas, o valor da reserva deve ser calculado
+				
+				verificaData(txtDataE, txtDataS);
+				calcularValor(txtDataE, txtDataS);
 			}
+			
+			private void verificaData(JDateChooser dataEntrada, JDateChooser dataSaida) {
+				
+				if(dataEntrada.getDate() != null && dataSaida.getDate() != null) {
+					LocalDate dataAtual = LocalDate.now();
+			        Date dataAtualDate = Date.from(dataAtual.atStartOfDay(ZoneId.systemDefault()).toInstant());
+			        Date dataSelecionada = dataEntrada.getDate();
+	
+			        // Verifica se a data selecionada é anterior à data atual
+			        if (dataSelecionada.before(dataAtualDate)) {
+			        	JOptionPane.showMessageDialog(null, "As datas de entrada e saída devem ser iguais ou superiores a data atual.");
+			        
+			            // Aqui você pode exibir uma mensagem de erro ou tomar a ação apropriada.
+			        } else {
+			            System.out.println("A data selecionada é igual ou posterior ao dia atual.");
+			            // A data é válida, você pode prosseguir com o processamento.
+			        }
+				}
+			};
+			private void calcularValor(JDateChooser dataEntrada, JDateChooser dataSaida) {
+				if(dataEntrada.getDate() != null && dataSaida.getDate() != null) {
+					
+					Calendar inicio = dataEntrada.getCalendar();
+					Calendar fim = dataSaida.getCalendar();
+					
+					int diaria = 180;
+					int dias = -1;
+					int valor;
+					
+					while(inicio.before(fim) || inicio.equals(fim)) {
+						dias++;
+						inicio.add(Calendar.DATE, 1);
+					}
+					
+					valor = dias * diaria;
+					txtValor.setText("" + valor);
+					
+				}
+			}
+			
 		});
 		txtDataS.setDateFormatString("yyyy-MM-dd");
 		txtDataS.getCalendarButton().setBackground(SystemColor.textHighlight);
@@ -293,16 +346,43 @@ public class ReservasView extends JFrame {
 		
 		JPanel btnProximo = new JPanel();
 		btnProximo.addMouseListener(new MouseAdapter() {
+			
 			@Override
 			public void mouseClicked(MouseEvent e) {
+				
 				if (ReservasView.txtDataE.getDate() != null && ReservasView.txtDataS.getDate() != null) {		
-					RegistroHospede registro = new RegistroHospede();
-					registro.setVisible(true);
+					salvarReserva();
+					
 				} else {
 					JOptionPane.showMessageDialog(null, "Deve preencher todos os campos.");
-				}
-			}						
+				}				
+			}
+
+			private void salvarReserva() {
+				
+				String dataEntrada = ((JTextField)txtDataE.getDateEditor().getUiComponent()).getText();
+				String dataSaida = ((JTextField)txtDataS.getDateEditor().getUiComponent()).getText();
+				
+				
+				ReservaDTO objReservaDTO = new ReservaDTO();
+				objReservaDTO.setDataEntrada(java.sql.Date.valueOf(dataEntrada));
+				objReservaDTO.setDataSaida(java.sql.Date.valueOf(dataSaida));
+				objReservaDTO.setValorReserva(txtValor.getText());
+				objReservaDTO.setFormaPagamento(txtFormaPagamento.getSelectedItem().toString());
+				
+				ReservaDAO reservaDAO = new ReservaDAO();
+				reservaDAO.cadastraReserva(objReservaDTO);
+			
+				RegistroHospede registro = new RegistroHospede(objReservaDTO);
+				registro.setVisible(true);
+				
+				JOptionPane.showMessageDialog(null, "Reserva salva com sucesso. Número da reserva " +objReservaDTO.getIdReserva());
+				
+				dispose();
+			}
 		});
+		
+
 		btnProximo.setLayout(null);
 		btnProximo.setBackground(SystemColor.textHighlight);
 		btnProximo.setBounds(238, 493, 122, 35);
@@ -323,6 +403,7 @@ public class ReservasView extends JFrame {
 	        yMouse = evt.getY();
 	    }
 
+	 
 	    private void headerMouseDragged(java.awt.event.MouseEvent evt) {
 	        int x = evt.getXOnScreen();
 	        int y = evt.getYOnScreen();
